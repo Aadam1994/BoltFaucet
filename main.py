@@ -1,6 +1,3 @@
-import os
-os.environ["REPLIT_DB_URL"] = ""
-
 def main():
     print("Hello from BoltFaucet")
     
