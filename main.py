@@ -1,15 +1,13 @@
 import telebot
 from telebot import types
-import time
 
-# حط التوكن تاعك هنا
-TOKEN = "8917587862:AAH627Ik8bEj43TyIVAVkdTr"
+TOKEN = "8917587862:AAH627Ik8bEj43TyIVAVkdTpefdacdfl3PU" 
 bot = telebot.TeleBot(TOKEN)
 
 @bot.message_handler(commands=['start'])
 def start(msg):
     name = msg.from_user.first_name
-    balance = 0.00 # هنا تبدلها كي تربط قاعدة البيانات
+    balance = 0.00
     
     text = f"""💎 مرحبا {name} | Welcome {name}
 
@@ -20,19 +18,16 @@ def start(msg):
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     btn1 = types.InlineKeyboardButton("🎬 مشاهدة إعلانات", callback_data="claim")
     btn2 = types.InlineKeyboardButton("💰 رصيدي", callback_data="balance")
-    btn3 = types.InlineKeyboardButton("👥 دعوة أصدقاء", callback_data="ref")
-    btn4 = types.InlineKeyboardButton("💸 سحب", callback_data="withdraw")
-    keyboard.add(btn1, btn2, btn3, btn4)
+    keyboard.add(btn1, btn2)
     
-    bot.send_message(msg.chat.id, text, reply_markup=keyboard, parse_mode="Markdown")
+    bot.send_message(msg.chat.id, text, reply_markup=keyboard)
 
-@bot.message_handler(commands=['claim'])
-def claim(msg):
-    bot.reply_to(msg, "✅ تم، راك ربحت LTC. رصيدك تحدث.")
+@bot.callback_query_handler(func=lambda call: True)
+def callback(call):
+    if call.data == "claim":
+        bot.answer_callback_query(call.id, "✅ تم ربحت LTC")
 
 def main():
-    print("Hello from BoltFaucet")
-    # هذا يخلي البوت شاعل 24/24
     bot.infinity_polling(skip_pending=True)
 
 if __name__ == "__main__":
