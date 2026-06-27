@@ -32,9 +32,9 @@ def show_menu(chat_id, name):
 <b>▫️ الرصيد:</b> <code>{user['balance']:.5f} LTC</code>
 <b>▫️ حساب FaucetPay:</b> <code>{user['faucetpay']}</code>
 """
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard = types.InlineKeyboardMarkup(row_width=2) # صححتها هنا
     keyboard.add(
-        types.In InlineKeyboardButton("🎥 مشاهدة الإعلانات", callback_data="claim"),
+        types.InlineKeyboardButton("🎥 مشاهدة الإعلانات", callback_data="claim"),
         types.InlineKeyboardButton("💳 عرض الرصيد", callback_data="balance"),
         types.InlineKeyboardButton("💵 طلب سحب", callback_data="withdraw"),
         types.InlineKeyboardButton("🏅 المتصدرين", callback_data="top"),
@@ -52,7 +52,7 @@ def claim(msg):
 @bot.message_handler(commands=['withdraw'])
 def withdraw(msg):
     user = get_user(msg)
-    user['state'] = None # نصفرو الstate قبل كل شي
+    user['state'] = None
     if user['faucetpay'] == "غير محدد":
         user['state'] = 'waiting_email'
         bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay للسحب</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>", parse_mode="HTML")
@@ -76,9 +76,9 @@ def process_email(msg):
     user = get_user(msg)
     if "@" in msg.text:
         user['faucetpay'] = msg.text
-        user['state'] = None # اهم حاجة: نصفر الstate
+        user['state'] = None
         bot.send_message(msg.chat.id, f"✅ <b>تم حفظ حسابك بنجاح</b>\n<code>{msg.text}</code>", parse_mode="HTML")
-        show_withdraw_menu(msg) # نطلعو المنيو مرة وحدة برك
+        show_withdraw_menu(msg)
     else:
         bot.send_message(msg.chat.id, "❌ <b>ايميل غير صالح</b>. عاود ارسل ايميل صحيح.")
 
@@ -127,4 +127,4 @@ def top(msg): bot.send_message(msg.chat.id, "🏅 <b>المتصدرين</b>\n1. 
 def referrals(msg): link = f"https://t.me/{bot.get_me().username}?start={msg.from_user.id}"; bot.send_message(msg.chat.id, f"🤝 <b>رابطك:</b>\n<code>{link}</code>", parse_mode="HTML")
 
 if __name__ == "__main__":
-    bot.polling(none_stop=True, skip_pending=True) # skip_pending باش نحيو الرسائل القديمة
+    bot.polling(none_stop=True, skip_pending=True)
