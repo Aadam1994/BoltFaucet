@@ -34,7 +34,7 @@ def show_menu(chat_id, name):
 """
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     keyboard.add(
-        types.InlineKeyboardButton("🎥 مشاهدة الإعلانات", callback_data="claim"),
+        types.In InlineKeyboardButton("🎥 مشاهدة الإعلانات", callback_data="claim"),
         types.InlineKeyboardButton("💳 عرض الرصيد", callback_data="balance"),
         types.InlineKeyboardButton("💵 طلب سحب", callback_data="withdraw"),
         types.InlineKeyboardButton("🏅 المتصدرين", callback_data="top"),
@@ -52,11 +52,10 @@ def claim(msg):
 @bot.message_handler(commands=['withdraw'])
 def withdraw(msg):
     user = get_user(msg)
-    # 1. اذا معندوش ايميل، نطلبو. اذا عندو نطلع المنيو طول
+    user['state'] = None # نصفرو الstate قبل كل شي
     if user['faucetpay'] == "غير محدد":
         user['state'] = 'waiting_email'
-        msg = bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay للسحب</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>", parse_mode="HTML")
-        bot.register_next_step_handler(msg, process_email)
+        bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay للسحب</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>", parse_mode="HTML")
     else:
         show_withdraw_menu(msg)
 
@@ -72,47 +71,32 @@ def show_withdraw_menu(msg):
 """
     bot.send_message(msg.chat.id, text, parse_mode="HTML")
 
+@bot.message_handler(func=lambda m: get_user(m).get('state') in ['waiting_email', 'waiting_new_email'])
 def process_email(msg):
     user = get_user(msg)
     if "@" in msg.text:
         user['faucetpay'] = msg.text
+        user['state'] = None # اهم حاجة: نصفر الstate
         bot.send_message(msg.chat.id, f"✅ <b>تم حفظ حسابك بنجاح</b>\n<code>{msg.text}</code>", parse_mode="HTML")
         show_withdraw_menu(msg) # نطلعو المنيو مرة وحدة برك
     else:
         bot.send_message(msg.chat.id, "❌ <b>ايميل غير صالح</b>. عاود ارسل ايميل صحيح.")
-        user['state'] = 'waiting_email'
-        bot.register_next_step_handler(msg, process_email)
 
 @bot.message_handler(commands=['setaddress'])
 def setaddress(msg):
     user = get_user(msg)
     user['state'] = 'waiting_new_email'
-    msg = bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay الجديد</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>", parse_mode="HTML")
-    bot.register_next_step_handler(msg, save_address)
+    bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay الجديد</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>", parse_mode="HTML")
 
-def save_address(msg):
+@bot.message_handler(func=lambda m: get_user(m).get('state') == 'waiting_amount')
+def handle_amount(msg):
     user = get_user(msg)
-    if "@" in msg.text:
-        user['faucetpay'] = msg.text
-        bot.send_message(msg.chat.id, f"✅ <b>تم تغيير الحساب بنجاح</b>\n<b>ايميلك الجديد:</b> <code>{msg.text}</code>", parse_mode="HTML")
-    else:
-        bot.send_message(msg.chat.id, "❌ <b>ايميل غير صالح</b>", parse_mode="HTML")
-    user['state'] = None
-
-@bot.message_handler(func=lambda m: True)
-def handle_text(msg):
-    user = get_user(msg)
-
-    if user.get('state') == 'waiting_amount':
-        try:
-            amount = float(msg.text)
-            user['state'] = None
-            process_withdraw(msg, amount)
-        except ValueError:
-            bot.send_message(msg.chat.id, "❌ <b>ارسل رقم صحيح</b>. مثال: 0.001", parse_mode="HTML")
-    else:
-        # اذا مكاش state، نتجاهلو الرسالة باش ما يعاودش
-        pass
+    try:
+        amount = float(msg.text)
+        user['state'] = None
+        process_withdraw(msg, amount)
+    except ValueError:
+        bot.send_message(msg.chat.id, "❌ <b>ارسل رقم صحيح</b>. مثال: 0.001", parse_mode="HTML")
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback(call):
@@ -143,4 +127,4 @@ def top(msg): bot.send_message(msg.chat.id, "🏅 <b>المتصدرين</b>\n1. 
 def referrals(msg): link = f"https://t.me/{bot.get_me().username}?start={msg.from_user.id}"; bot.send_message(msg.chat.id, f"🤝 <b>رابطك:</b>\n<code>{link}</code>", parse_mode="HTML")
 
 if __name__ == "__main__":
-    bot.polling(none_stop=True)
+    bot.polling(none_stop=True, skip_pending=True) # skip_pending باش نحيو الرسائل القديمة
