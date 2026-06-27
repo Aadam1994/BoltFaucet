@@ -12,7 +12,7 @@ user_data = {}
 def get_user(msg):
     uid = msg.from_user.id
     if uid not in user_data:
-        user_data[uid] = {"balance": 0.0, "faucetpay": "غير محدد"}
+        user_data[uid] = {"balance": 0.0, "faucetpay": "غير محدد", "state": None}
     return user_data[uid]
 
 def send_fp_ltc(to, amount):
@@ -60,20 +60,22 @@ def withdraw(msg):
 
 def show_withdraw_menu(msg):
     user = get_user(msg)
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        types.InlineKeyboardButton(f"سحب الكل: {user['balance']:.5f}", callback_data="withdraw_all"),
-        types.InlineKeyboardButton("الحد الأدنى", callback_data=f"withdraw_{MIN_WITHDRAW}"),
-        types.InlineKeyboardButton("رجوع", callback_data="back_menu")
-    )
-    bot.send_message(msg.chat.id, f"💵 <b>اختر المبلغ للسحب</b>\n\n<b>رصيدك:</b> <code>{user['balance']:.5f} LTC</code>\n<b>الحد الأدنى:</b> <code>{MIN_WITHDRAW} LTC</code>", reply_markup=keyboard, parse_mode="HTML")
+    user['state'] = 'waiting_amount' # نخلي البوت يستنى المبلغ
+    text = f"""💵 <b>اختر المبلغ للسحب</b>
+
+<b>رصيدك:</b> <code>{user['balance']:.5f} LTC</code>
+<b>الحد الأدنى:</b> <code>{MIN_WITHDRAW} LTC</code>
+
+<b>ملاحظة:</b> السحب يرسل تلقائي على الساعة 00:00
+"""
+    bot.send_message(msg.chat.id, text, parse_mode="HTML")
 
 def process_withdraw_email(msg):
     user = get_user(msg)
     if "@" in msg.text:
         user['faucetpay'] = msg.text
         bot.send_message(msg.chat.id, f"✅ <b>تم حفظ حسابك بنجاح</b>\n<code>{msg.text}</code>", parse_mode="HTML")
-        show_withdraw_menu(msg) # نطلعو قائمة السحب طول
+        show_withdraw_menu(msg)
     else:
         bot.send_message(msg.chat.id, "❌ <b>ايميل غير صالح</b>. عاود ارسل ايميل FaucetPay صحيح.")
 
@@ -90,6 +92,20 @@ def save_address(msg):
     else:
         bot.send_message(msg.chat.id, "❌ <b>ايميل غير صالح</b>", parse_mode="HTML")
 
+@bot.message_handler(func=lambda m: True)
+def handle_text(msg):
+    user = get_user(msg)
+    # اذا كان يستنى المبلغ
+    if user.get('state') == 'waiting_amount':
+        try:
+            amount = float(msg.text)
+            user['state'] = None
+            process_withdraw(msg, amount)
+        except ValueError:
+            bot.send_message(msg.chat.id, "❌ <b>ارسل رقم صحيح</b>. مثال: 0.001", parse_mode="HTML")
+    else:
+        bot.send_message(msg.chat.id, "اضغط على زر من القائمة 👇")
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback(call):
     if call.data == "claim": claim(call.message)
@@ -98,10 +114,6 @@ def callback(call):
     elif call.data == "top": top(call.message)
     elif call.data == "referrals": referrals(call.message)
     elif call.data == "setaddress": setaddress(call.message)
-    elif call.data == "back_menu": start(call.message)
-    elif call.data.startswith("withdraw_"):
-        amount = float(call.data.split("_")[1]) if call.data!= "withdraw_all" else get_user(call.message)['balance']
-        process_withdraw(call.message, amount)
     bot.answer_callback_query(call.id)
 
 def process_withdraw(msg, amount):
@@ -114,7 +126,7 @@ def process_withdraw(msg, amount):
     res = send_fp_ltc(user['faucetpay'], amount)
     if res.get("status") == 200:
         user['balance'] -= amount
-        bot.send_message(msg.chat.id, f"✅ <b>تم السحب بنجاح</b>\nتم تحويل <code>{amount:.5f} LTC</code>", parse_mode="HTML")
+        bot.send_message(msg.chat.id, f"✅ <b>تم طلب السحب بنجاح</b>\nسيتم ارسال <code>{amount:.5f} LTC</code> على الساعة 00:00", parse_mode="HTML")
     else:
         bot.send_message(msg.chat.id, f"❌ <b>خطأ في السحب:</b> {res.get('message')}")
 
