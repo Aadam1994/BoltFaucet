@@ -53,7 +53,7 @@ def claim(msg):
 def withdraw(msg):
     user = get_user(msg)
     if user['faucetpay'] == "غير محدد":
-        return bot.send_message(msg.chat.id, "❌ <b>حط ايميل FaucetPay تاعك اول</b> من زر تغيير الحساب", parse_mode="HTML")
+        return bot.send_message(msg.chat.id, "❌ <b>ضع ايميل الفوسيت باي الخاص بك اول</b>\nمن زر تغيير الحساب", parse_mode="HTML")
     if user['balance'] >= 0.001:
         res = send_fp_ltc(user['faucetpay'], user['balance'])
         if res.get("status") == 200:
@@ -66,16 +66,16 @@ def withdraw(msg):
 
 @bot.message_handler(commands=['setaddress'])
 def setaddress(msg):
-    bot.send_message(msg.chat.id, "📮 <b>ضع ايميل FaucetPay الخاص بك</b>\n\nمثال: you@gmail.com\nسيتم السحب لهذا الحساب مباشرة.", parse_mode="HTML")
+    msg = bot.send_message(msg.chat.id, "📮 <b>ضع ايميل الفوسيت باي الجديد</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>\nسيتم السحب لهذا الحساب مباشرة.", parse_mode="HTML")
+    bot.register_next_step_handler(msg, save_address) # هنا السر: يقبل الرسالة الجاية برك
 
-@bot.message_handler(func=lambda m: True)
 def save_address(msg):
     user = get_user(msg)
     if "@" in msg.text:
         user['faucetpay'] = msg.text
         bot.send_message(msg.chat.id, f"✅ <b>تم حفظ حساب FaucetPay</b>\n<code>{msg.text}</code>", parse_mode="HTML")
     else:
-        bot.send_message(msg.chat.id, "❌ <b>هذا ليس ايميل صالح</b>", parse_mode="HTML")
+        bot.send_message(msg.chat.id, "❌ <b>هذا ليس ايميل صالح</b>. ارسل ايميل FaucetPay صحيح.")
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback(call):
@@ -89,7 +89,7 @@ def callback(call):
 
 def balance(msg): bot.send_message(msg.chat.id, f"💳 <b>رصيدك:</b> <code>{get_user(msg)['balance']:.5f} LTC</code>", parse_mode="HTML")
 def top(msg): bot.send_message(msg.chat.id, "🏅 <b>المتصدرين</b>\n1. Adam - 0.50000\n2. انت - 0.00000", parse_mode="HTML")
-def referrals(msg): bot.send_message(msg.chat.id, f"🤝 <b>رابطك:</b>\n<code>https://t.me/{bot.get_me().username}?start={msg.from_user.id}</code>", parse_mode="HTML")
+def referrals(msg): link = f"https://t.me/{bot.get_me().username}?start={msg.from_user.id}"; bot.send_message(msg.chat.id, f"🤝 <b>رابطك:</b>\n<code>{link}</code>", parse_mode="HTML")
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
