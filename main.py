@@ -25,4 +25,15 @@ def start(msg):
 """
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     btn1 = types.InlineKeyboardButton("🎬 مشاهدة إعلانات", callback_data="claim")
-    btn2 = types.InlineKeyboardButton("💰 رصيد
+    btn2 = types.InlineKeyboardButton("💰 رصيدي", callback_data="balance") # هنا كان الخطأ، كان ناقص
+    btn3 = types.InlineKeyboardButton("💸 سحب", callback_data="withdraw")
+    btn4 = types.InlineKeyboardButton("🏆 المتصدرين", callback_data="top")
+    btn5 = types.InlineKeyboardButton("👥 دعوة أصدقاء", callback_data="referrals")
+    btn6 = types.InlineKeyboardButton("📩 ضبط العنوان", callback_data="setaddress")
+    keyboard.add(btn1, btn2, btn3, btn4, btn5, btn6) # هنا زدناها
+
+    bot.send_message(msg.chat.id, text, reply_markup=keyboard)
+
+@bot.message_handler(commands=['claim'])
+def claim(msg):
+    user = get
