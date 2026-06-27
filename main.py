@@ -21,8 +21,7 @@ def send_fp_ltc(to, amount):
     return r.json()
 
 @bot.message_handler(commands=['start'])
-def start(msg):
-    show_menu(msg.chat.id, msg.from_user.first_name)
+def start(msg): show_menu(msg.chat.id, msg.from_user.first_name)
 
 def show_menu(chat_id, name):
     user = get_user(type('obj', (object,), {'from_user': type('obj', (object,), {'id': chat_id})}))
@@ -52,8 +51,13 @@ def claim(msg):
 @bot.message_handler(commands=['withdraw'])
 def withdraw(msg):
     user = get_user(msg)
+    # اذا معندوش ايميل مخزن، نطلبو منو هنا
     if user['faucetpay'] == "غير محدد":
-        return bot.send_message(msg.chat.id, "❌ <b>ضع ايميل الفوسيت باي الخاص بك اول</b>\nمن زر تغيير الحساب", parse_mode="HTML")
+        msg = bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay للسحب</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>", parse_mode="HTML")
+        bot.register_next_step_handler(msg, process_withdraw_email)
+        return
+
+    # اذا عندو ايميل، يسحب ديراكت
     if user['balance'] >= 0.001:
         res = send_fp_ltc(user['faucetpay'], user['balance'])
         if res.get("status") == 200:
@@ -64,18 +68,27 @@ def withdraw(msg):
     else:
         bot.send_message(msg.chat.id, f"❌ <b>الحد الأدنى 0.001 LTC</b>\nرصيدك: <code>{user['balance']:.5f}</code>", parse_mode="HTML")
 
+def process_withdraw_email(msg):
+    user = get_user(msg)
+    if "@" in msg.text:
+        user['faucetpay'] = msg.text # نخزن الايميل
+        bot.send_message(msg.chat.id, f"✅ <b>تم حفظ ايميلك</b>\n<code>{msg.text}</code>\nتقدر تسحب ضرك.")
+        withdraw(msg) # نعيطو للسحب مرة اخرى باه يسحب ديراكت
+    else:
+        bot.send_message(msg.chat.id, "❌ <b>ايميل غير صالح</b>. عاود ارسل ايميل FaucetPay صحيح.")
+
 @bot.message_handler(commands=['setaddress'])
 def setaddress(msg):
-    msg = bot.send_message(msg.chat.id, "📮 <b>ضع ايميل الفوسيت باي الجديد</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>\nسيتم السحب لهذا الحساب مباشرة.", parse_mode="HTML")
-    bot.register_next_step_handler(msg, save_address) # هنا السر: يقبل الرسالة الجاية برك
+    msg = bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay الجديد</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>", parse_mode="HTML")
+    bot.register_next_step_handler(msg, save_address)
 
 def save_address(msg):
     user = get_user(msg)
     if "@" in msg.text:
         user['faucetpay'] = msg.text
-        bot.send_message(msg.chat.id, f"✅ <b>تم حفظ حساب FaucetPay</b>\n<code>{msg.text}</code>", parse_mode="HTML")
+        bot.send_message(msg.chat.id, f"✅ <b>تم تغيير الحساب بنجاح</b>\nايميلك الجديد: <code>{msg.text}</code>", parse_mode="HTML")
     else:
-        bot.send_message(msg.chat.id, "❌ <b>هذا ليس ايميل صالح</b>. ارسل ايميل FaucetPay صحيح.")
+        bot.send_message(msg.chat.id, "❌ <b>ايميل غير صالح</b>")
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback(call):
