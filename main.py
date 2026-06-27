@@ -9,7 +9,7 @@ user_data = {}
 def get_user(msg):
     uid = msg.from_user.id
     if uid not in user_data:
-        user_data[uid] = {"balance": 0.0, "address": "غير مضبوط"}
+        user_data[uid] = {"balance": 0.0, "address": "غير محدد"}
     return user_data[uid]
 
 @bot.message_handler(commands=['start'])
@@ -17,67 +17,67 @@ def start(msg):
     user = get_user(msg)
     name = msg.from_user.first_name
 
-    # رسالة كبيرة و منظمة
-    text = f"""💎 <b>مرحبا {name}</b> 💎
+    text = f"""✨ <b>مرحباً بك في Ltc Earn Faucet</b> ✨
 
-━━━━━━━━━━
-🏦 <b>محفظتك:</b> <code>{user['balance']:.5f} LTC</code>
-🎯 <b>الحد الأدنى للسحب:</b> 0.001 LTC
-👤 <b>عنوانك:</b> <code>{user['address']}</code>
-━━━━━━━━━━
+<b>▫️ الاسم:</b> {name}
+<b>▫️ الرصيد الحالي:</b> <code>{user['balance']:.5f} LTC</code>
+<b>▫️ عنوان المحفظة:</b> <code>{user['address']}</code>
+<b>▫️ الحد الأدنى للسحب:</b> 0.001 LTC
 
-اختر من القائمة بالأسفل 👇
+اختر العملية التي تريدها من الأسفل:
 """
-    # كل البوتونات يبانو
     keyboard = types.InlineKeyboardMarkup(row_width=2)
-    btn1 = types.InlineKeyboardButton("🎬 مشاهدة إعلانات", callback_data="claim")
-    btn2 = types.InlineKeyboardButton("💰 رصيدي", callback_data="balance")
-    btn3 = types.InlineKeyboardButton("💸 سحب", callback_data="withdraw")
-    btn4 = types.InlineKeyboardButton("🏆 المتصدرين", callback_data="top")
-    btn5 = types.InlineKeyboardButton("👥 دعوة أصدقاء", callback_data="referrals")
-    btn6 = types.InlineKeyboardButton("📩 ضبط العنوان", callback_data="setaddress")
-    keyboard.add(btn1, btn2, btn3, btn4, btn5, btn6)
-
+    keyboard.add(
+        types.InlineKeyboardButton("🎥 مشاهدة الإعلانات", callback_data="claim"),
+        types.InlineKeyboardButton("💳 عرض الرصيد", callback_data="balance"),
+        types.InlineKeyboardButton("💵 طلب سحب", callback_data="withdraw"),
+        types.InlineKeyboardButton("🏅 لوحة المتصدرين", callback_data="top"),
+        types.InlineKeyboardButton("🤝 نظام الإحالة", callback_data="referrals"),
+        types.InlineKeyboardButton("📮 تغيير العنوان", callback_data="setaddress")
+    )
     bot.send_message(msg.chat.id, text, reply_markup=keyboard, parse_mode="HTML")
 
-# باقي الفانكشنز كيف
 @bot.message_handler(commands=['claim'])
 def claim(msg):
     user = get_user(msg)
     user['balance'] += 0.00001
-    bot.send_message(msg.chat.id, f"✅ <b>تم!</b>\nربحت <code>+0.00001 LTC</code>\nرصيدك الجديد: <code>{user['balance']:.5f} LTC</code>", parse_mode="HTML")
+    bot.send_message(msg.chat.id, f"✅ <b>تم إضافة الأرباح بنجاح</b>\n\n+ 0.00001 LTC\nرصيدك الجديد: <code>{user['balance']:.5f} LTC</code>", parse_mode="HTML")
 
 @bot.message_handler(commands=['balance'])
 def balance(msg):
     user = get_user(msg)
-    bot.send_message(msg.chat.id, f"💰 <b>رصيدك الحالي:</b>\n<code>{user['balance']:.5f} LTC</code>", parse_mode="HTML")
+    bot.send_message(msg.chat.id, f"💳 <b>رصيدك الحالي</b>\n\n<code>{user['balance']:.5f} LTC</code>", parse_mode="HTML")
 
 @bot.message_handler(commands=['withdraw'])
 def withdraw(msg):
     user = get_user(msg)
     if user['balance'] >= 0.001:
-        bot.send_message(msg.chat.id, f"💸 <b>تم طلب السحب بنجاح ✅</b>")
+        bot.send_message(msg.chat.id, f"✅ <b>تم استلام طلب السحب</b>\n\nسيتم تحويل <code>{user['balance']:.5f} LTC</code> إلى محفظتك قريباً.", parse_mode="HTML")
         user['balance'] = 0
     else:
-        bot.send_message(msg.chat.id, f"❌ <b>الحد الأدنى للسحب 0.001 LTC</b>\nرصيدك: <code>{user['balance']:.5f} LTC</code>", parse_mode="HTML")
+        bot.send_message(msg.chat.id, f"❌ <b>رصيدك غير كافي للسحب</b>\n\nالحد الأدنى: <code>0.001 LTC</code>\nرصيدك: <code>{user['balance']:.5f} LTC</code>", parse_mode="HTML")
 
 @bot.message_handler(commands=['top'])
-def top(msg): bot.send_message(msg.chat.id, "🏆 <b>قائمة المتصدرين:</b>\n1. Adam - 0.5 LTC\n2. انت - 0.0 LTC", parse_mode="HTML")
+def top(msg):
+    bot.send_message(msg.chat.id, "🏅 <b>لوحة المتصدرين</b>\n\n1. Adam - <code>0.50000 LTC</code>\n2. أنت - <code>0.00000 LTC</code>", parse_mode="HTML")
 
 @bot.message_handler(commands=['referrals'])
 def referrals(msg):
     link = f"https://t.me/{bot.get_me().username}?start={msg.from_user.id}"
-    bot.send_message(msg.chat.id, f"👥 <b>رابط الدعوة تاعك:</b>\n<code>{link}</code>\nتربح 10% من ارباح اصدقائك", parse_mode="HTML")
+    bot.send_message(msg.chat.id, f"🤝 <b>نظام الإحالة</b>\n\nشارك هذا الرابط مع أصدقائك واربح 10% من أرباحهم:\n<code>{link}</code>", parse_mode="HTML")
 
 @bot.message_handler(commands=['setaddress'])
-def setaddress(msg): bot.send_message(msg.chat.id, "📩 <b>ابعثلي عنوان محفظة LTC تاعك ضرك</b>")
+def setaddress(msg):
+    bot.send_message(msg.chat.id, "📮 <b>تغيير عنوان المحفظة</b>\n\nالرجاء إرسال عنوان محفظة LTC صالح الآن.")
 
 @bot.message_handler(func=lambda m: True)
 def save_address(msg):
     user = get_user(msg)
-    if msg.text.startswith("L") or msg.text.startswith("M"):
+    if msg.text.startswith("L") or msg.text.startswith("M") or msg.text.startswith("3"):
         user['address'] = msg.text
-        bot.send_message(msg.chat.id, f"✅ <b>تم حفظ العنوان:</b>\n<code>{msg.text}</code>", parse_mode="HTML")
+        bot.send_message(msg.chat.id, f"✅ <b>تم حفظ عنوان المحفظة بنجاح</b>\n\n<code>{msg.text}</code>", parse_mode="HTML")
+    else:
+        bot.send_message(msg.chat.id, "❌ <b>عنوان LTC غير صالح</b>\nيجب أن يبدأ بـ L أو M أو 3")
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback(call):
