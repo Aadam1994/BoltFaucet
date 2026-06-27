@@ -4,6 +4,7 @@ from telebot import types
 TOKEN = "8917587862:AAH627Ik8bEj43TyIVAVkdTpefdacdfl3PU"
 bot = telebot.TeleBot(TOKEN)
 
+# قاعدة بيانات مؤقتة
 user_data = {}
 
 def get_user(msg):
@@ -23,22 +24,5 @@ def start(msg):
 السحب يبدأ من: 0.001 LTC
 """
     keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        types.InlineKeyboardButton("🎬 مشاهدة إعلانات", callback_data="claim"),
-        types.InlineKeyboardButton("💰 رصيدي", callback_data="balance"),
-    )
-    bot.send_message(msg.chat.id, text, reply_markup=keyboard)
-
-@bot.message_handler(commands=['claim'])
-def claim(msg):
-    user = get_user(msg)
-    user['balance'] += 0.00001
-    bot.send_message(msg.chat.id, f"✅ تم! رصيدك: {user['balance']} LTC")
-
-@bot.message_handler(commands=['balance'])
-def balance(msg):
-    user = get_user(msg)
-    bot.send_message(msg.chat.id, f"💰 رصيدك: {user['balance']} LTC")
-
-if __name__ == "__main__":
-    bot.polling(none_stop=True, skip_pending=True, interval=0)
+    btn1 = types.InlineKeyboardButton("🎬 مشاهدة إعلانات", callback_data="claim")
+    btn2 = types.InlineKeyboardButton("💰 رصيد
