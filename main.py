@@ -1,19 +1,38 @@
 import telebot
 from telebot import types
 import requests
+import sqlite3
 
 TOKEN = "8917587862:AAH627Ik8bEj43TyIVAVkdTpefdacdfl3PU"
 FAUCETPAY_API = "حط_API_KEY_تاعك_هنا"
 MIN_WITHDRAW = 0.001
 bot = telebot.TeleBot(TOKEN)
 
-user_data = {}
+# 1. قاعدة البيانات SQLite باش يتحفظ الإيميل
+conn = sqlite3.connect("users.db", check_same_thread=False)
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS users
+             (user_id INTEGER PRIMARY KEY, balance REAL, faucetpay TEXT)''')
+conn.commit()
 
 def get_user(msg):
     uid = msg.from_user.id
-    if uid not in user_data:
-        user_data[uid] = {"balance": 0.0, "faucetpay": "غير محدد", "state": None}
-    return user_data[uid]
+    c.execute("SELECT balance, faucetpay FROM users WHERE user_id=?", (uid,))
+    row = c.fetchone()
+    if row:
+        return {"user_id": uid, "balance": row[0], "faucetpay": row[1], "state": None}
+    else:
+        c.execute("INSERT INTO users VALUES (?,?,?)", (uid, 0.0, "غير محدد"))
+        conn.commit()
+        return {"user_id": uid, "balance": 0.0, "faucetpay": "غير محدد", "state": None}
+
+def save_email(user_id, email): # Overwrite يصرا هنا
+    c.execute("UPDATE users SET faucetpay=? WHERE user_id=?", (email, user_id))
+    conn.commit()
+
+def update_balance(user_id, new_balance):
+    c.execute("UPDATE users SET balance=? WHERE user_id=?", (new_balance, user_id))
+    conn.commit()
 
 def send_fp_ltc(to, amount):
     url = "https://faucetpay.io/api/v1/send"
@@ -25,14 +44,14 @@ def send_fp_ltc(to, amount):
 def start(msg): show_menu(msg.chat.id, msg.from_user.first_name)
 
 def show_menu(chat_id, name):
-    user = get_user(type('obj', (object,), {'from_user': type('obj', (object,), {'id': chat_id})}))
+    user = get_user(type('obj', (object,), {'from_user': type('obj', (object,), {'id': chat_id})})))
     text = f"""✨ <b>لوحة التحكم</b> ✨
 
 <b>▫️ الاسم:</b> {name}
 <b>▫️ الرصيد:</b> <code>{user['balance']:.5f} LTC</code>
 <b>▫️ حساب FaucetPay:</b> <code>{user['faucetpay']}</code>
 """
-    keyboard = types.InlineKeyboardMarkup(row_width=2) # صححتها هنا
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
     keyboard.add(
         types.InlineKeyboardButton("🎥 مشاهدة الإعلانات", callback_data="claim"),
         types.InlineKeyboardButton("💳 عرض الرصيد", callback_data="balance"),
@@ -46,8 +65,9 @@ def show_menu(chat_id, name):
 @bot.message_handler(commands=['claim'])
 def claim(msg):
     user = get_user(msg)
-    user['balance'] += 0.00001
-    bot.send_message(msg.chat.id, f"✅ <b>تم إضافة 0.00001 LTC</b>\nرصيدك: <code>{user['balance']:.5f}</code>", parse_mode="HTML")
+    new_balance = user['balance'] + 0.00001
+    update_balance(user['user_id'], new_balance)
+    bot.send_message(msg.chat.id, f"✅ <b>تم إضافة 0.00001 LTC</b>\nرصيدك: <code>{new_balance:.5f}</code>", parse_mode="HTML")
 
 @bot.message_handler(commands=['withdraw'])
 def withdraw(msg):
@@ -66,27 +86,24 @@ def show_withdraw_menu(msg):
 
 <b>رصيدك:</b> <code>{user['balance']:.5f} LTC</code>
 <b>الحد الأدنى:</b> <code>{MIN_WITHDRAW} LTC</code>
-
-<b>ملاحظة:</b> السحب يرسل تلقائي على الساعة 00:00 (GMT+1)
 """
     bot.send_message(msg.chat.id, text, parse_mode="HTML")
-
-@bot.message_handler(func=lambda m: get_user(m).get('state') in ['waiting_email', 'waiting_new_email'])
-def process_email(msg):
-    user = get_user(msg)
-    if "@" in msg.text:
-        user['faucetpay'] = msg.text
-        user['state'] = None
-        bot.send_message(msg.chat.id, f"✅ <b>تم حفظ حسابك بنجاح</b>\n<code>{msg.text}</code>", parse_mode="HTML")
-        show_withdraw_menu(msg)
-    else:
-        bot.send_message(msg.chat.id, "❌ <b>ايميل غير صالح</b>. عاود ارسل ايميل صحيح.")
 
 @bot.message_handler(commands=['setaddress'])
 def setaddress(msg):
     user = get_user(msg)
     user['state'] = 'waiting_new_email'
     bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay الجديد</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>", parse_mode="HTML")
+
+@bot.message_handler(func=lambda m: get_user(m).get('state') in ['waiting_email', 'waiting_new_email'])
+def process_email(msg):
+    user = get_user(msg)
+    if "@" in msg.text and "." in msg.text:
+        save_email(user['user_id'], msg.text) # هنا يدير Overwrite للإيميل القديم
+        bot.send_message(msg.chat.id, f"✅ <b>تم حفظ حسابك بنجاح</b>\n<code>{msg.text}</code>", parse_mode="HTML")
+        show_withdraw_menu(msg)
+    else:
+        bot.send_message(msg.chat.id, "❌ <b>ايميل غير صالح</b>. عاود ارسل ايميل صحيح.")
 
 @bot.message_handler(func=lambda m: get_user(m).get('state') == 'waiting_amount')
 def handle_amount(msg):
@@ -117,14 +134,21 @@ def process_withdraw(msg, amount):
 
     res = send_fp_ltc(user['faucetpay'], amount)
     if res.get("status") == 200:
-        user['balance'] -= amount
-        bot.send_message(msg.chat.id, f"✅ <b>تم طلب السحب بنجاح</b>\nسيتم ارسال <code>{amount:.5f} LTC</code> على الساعة 00:00 (GMT+1)", parse_mode="HTML")
+        new_balance = user['balance'] - amount
+        update_balance(user['user_id'], new_balance)
+        bot.send_message(msg.chat.id, f"✅ <b>تم طلب السحب بنجاح</b>\nسيتم ارسال <code>{amount:.5f} LTC</code> للحساب <code>{user['faucetpay']}</code>", parse_mode="HTML")
     else:
         bot.send_message(msg.chat.id, f"❌ <b>خطأ في السحب:</b> {res.get('message')}")
 
-def balance(msg): bot.send_message(msg.chat.id, f"💳 <b>رصيدك:</b> <code>{get_user(msg)['balance']:.5f} LTC</code>", parse_mode="HTML")
+def balance(msg):
+    user = get_user(msg)
+    bot.send_message(msg.chat.id, f"💳 <b>رصيدك:</b> <code>{user['balance']:.5f} LTC</code>", parse_mode="HTML")
+
 def top(msg): bot.send_message(msg.chat.id, "🏅 <b>المتصدرين</b>\n1. Adam - 0.50000\n2. انت - 0.00000", parse_mode="HTML")
-def referrals(msg): link = f"https://t.me/{bot.get_me().username}?start={msg.from_user.id}"; bot.send_message(msg.chat.id, f"🤝 <b>رابطك:</b>\n<code>{link}</code>", parse_mode="HTML")
+
+def referrals(msg):
+    link = f"https://t.me/{bot.get_me().username}?start={msg.from_user.id}"
+    bot.send_message(msg.chat.id, f"🤝 <b>رابطك:</b>\n<code>{link}</code>", parse_mode="HTML")
 
 if __name__ == "__main__":
     bot.polling(none_stop=True, skip_pending=True)
