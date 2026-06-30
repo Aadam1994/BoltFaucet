@@ -8,7 +8,7 @@ FAUCETPAY_API = "حط_API_KEY_تاعك_هنا"
 MIN_WITHDRAW = 0.001
 bot = telebot.TeleBot(TOKEN)
 
-user_states = {} # 1=waiting_email, 2=waiting_amount, 3=waiting_new_email
+user_states = {} # هذا برك اللي يتحكم في الحالة
 
 conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
@@ -23,8 +23,13 @@ def get_user(uid):
     conn.commit()
     return {"user_id": uid, "balance": 0.0, "faucetpay": "غير محدد"}
 
-def save_email(user_id, email): c.execute("UPDATE users SET faucetpay=? WHERE user_id=?", (email, user_id)); conn.commit()
-def update_balance(user_id, new_balance): c.execute("UPDATE users SET balance=? WHERE user_id=?", (new_balance, user_id)); conn.commit()
+def save_email(user_id, email):
+    c.execute("UPDATE users SET faucetpay=? WHERE user_id=?", (email, user_id))
+    conn.commit()
+
+def update_balance(user_id, new_balance):
+    c.execute("UPDATE users SET balance=? WHERE user_id=?", (new_balance, user_id))
+    conn.commit()
 
 def send_fp_ltc(to, amount):
     url = "https://faucetpay.io/api/v1/send"
@@ -53,30 +58,26 @@ def withdraw(msg):
     uid = msg.from_user.id
     user = get_user(uid)
     if user['faucetpay'] == "غير محدد":
-        user_states[uid] = 'waiting_email' # حالة 1: يطلب ايميل
+        user_states[uid] = 'waiting_email'
         bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay للسحب</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>", parse_mode="HTML")
     else:
-        user_states[uid] = 'waiting_amount' # حالة 2: ايميل موجود، يطلب مبلغ طول
+        user_states[uid] = 'waiting_amount'
         bot.send_message(msg.chat.id, f"💵 <b>ادخل مبلغ السحب</b>\n<b>رصيدك:</b> <code>{user['balance']:.5f} LTC</code>\n<b>الحد الأدنى:</b> <code>{MIN_WITHDRAW} LTC</code>\n<b>للحساب:</b> <code>{user['faucetpay']}</code>", parse_mode="HTML")
 
 @bot.message_handler(commands=['setaddress'])
 def setaddress(msg):
     uid = msg.from_user.id
-    user_states[uid] = 'waiting_new_email' # حالة 3: يطلب ايميل جديد
+    user_states[uid] = 'waiting_new_email'
     bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay الجديد</b>\nسيتم استبدال القديم أوتوماتيكيا.", parse_mode="HTML")
 
+# اهم تعديل: نستعمل user_states مباشرة ماشي get_user
 @bot.message_handler(func=lambda m: user_states.get(m.from_user.id) in ['waiting_email', 'waiting_new_email'])
 def process_email(msg):
     uid = msg.from_user.id
     if "@" in msg.text and "." in msg.text:
-        save_email(uid, msg.text) # Overwrite يصرا هنا
-        user_states.pop(uid, None) # نخرجو من الحالة
-        bot.send_message(msg.chat.id, f"✅ <b>تم حفظ الإيميل بنجاح</b>\n<code>{msg.text}</code>", parse_mode="HTML")
-
-        # بعد الحفظ، نطلب المبلغ مباشرة
-        user = get_user(uid)
-        user_states[uid] = 'waiting_amount'
-        bot.send_message(msg.chat.id, f"💵 <b>ادخل مبلغ السحب</b>\n<b>رصيدك:</b> <code>{user['balance']:.5f} LTC</code>\n<b>الحد الأدنى:</b> <code>{MIN_WITHDRAW} LTC</code>", parse_mode="HTML")
+        save_email(uid, msg.text)
+        user_states[uid] = 'waiting_amount' # نبدلو الحالة طول للمبلغ
+        bot.send_message(msg.chat.id, f"✅ <b>تم حفظ الإيميل بنجاح</b>\n<code>{msg.text}</code>\n\n💵 <b>ادخل مبلغ السحب</b>\n<b>الحد الأدنى:</b> <code>{MIN_WITHDRAW} LTC</code>", parse_mode="HTML")
     else:
         bot.send_message(msg.chat.id, "❌ <b>ايميل غير صالح</b>. عاود ارسل ايميل صحيح.")
 
@@ -86,11 +87,10 @@ def handle_amount(msg):
     user = get_user(uid)
     try:
         amount = float(msg.text)
-        user_states.pop(uid, None) # نخرجو من الحالة
+        user_states.pop(uid, None) # نمسحو الحالة بعد ما نكملو
 
         if amount < MIN_WITHDRAW:
             return bot.send_message(msg.chat.id, f"❌ <b>المبلغ أقل من الحد الأدنى</b>\nالحد الأدنى: <code>{MIN_WITHDRAW} LTC</code>", parse_mode="HTML")
-
         if user['balance'] < amount:
             return bot.send_message(msg.chat.id, f"❌ <b>رصيدك غير كافي</b>\nرصيدك: <code>{user['balance']:.5f} LTC</code>", parse_mode="HTML")
 
@@ -116,4 +116,4 @@ def balance(msg): user = get_user(msg.from_user.id); bot.send_message(msg.chat.i
 
 if __name__ == "__main__":
     print("Bot is running...")
-    bot.polling(none_stop=True)
+    bot.polling(none_stop=True, skip_pending=True)
