@@ -31,18 +31,17 @@ def start(msg):
     user = get_user(msg.from_user.id)
     text = f"✨ لوحة التحكم ✨\n\nالاسم: {msg.from_user.first_name}\nالرصيد: {user['balance']:.5f} LTC\nحساب FaucetPay: {user['faucetpay']}"
 
-    # نمسح الكيبورد القديم بطريقة صحيحة
-    bot.send_message(msg.chat.id, "جار التحميل...", reply_markup=types.ReplyKeyboardRemove())
+    # نحينا "جار التحميل" نهائيا
 
-    # الترتيب: مشاهدة الاعلانات قبل عرض الرصيد
+    # الترتيب: حطينا عرض الرصيد الاول باش يجي على اليسار، ومشاهدة الاعلانات الثاني باش يجي على اليمين
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     keyboard.add(
-        types.InlineKeyboardButton("🎥 مشاهدة الاعلانات", callback_data="claim"),
-        types.InlineKeyboardButton("💳 عرض الرصيد", callback_data="balance")
+        types.InlineKeyboardButton("💳 عرض الرصيد", callback_data="balance"),
+        types.InlineKeyboardButton("🎥 مشاهدة الاعلانات", callback_data="claim")
     )
     keyboard.add(
-        types.InlineKeyboardButton("📮 تغيير الحساب", callback_data="setaddress"),
-        types.InlineKeyboardButton("💵 طلب سحب", callback_data="withdraw")
+        types.InlineKeyboardButton("💵 طلب سحب", callback_data="withdraw"),
+        types.InlineKeyboardButton("📮 تغيير الحساب", callback_data="setaddress")
     )
     bot.send_message(msg.chat.id, text, reply_markup=keyboard)
 
