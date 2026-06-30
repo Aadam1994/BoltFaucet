@@ -31,11 +31,11 @@ def start(msg):
     user = get_user(msg.from_user.id)
     text = f"✨ لوحة التحكم ✨\n\nالاسم: {msg.from_user.first_name}\nالرصيد: {user['balance']:.5f} LTC\nحساب FaucetPay: {user['faucetpay']}"
 
-    # 1. نمسحو الازرار القديمة اللي تحت الكتابة
+    # نمسح الكيبورد القديم بصمت
     remove_keyboard = types.ReplyKeyboardRemove()
-    bot.send_message(msg.chat.id, "تم تحديث القائمة", reply_markup=remove_keyboard)
+    bot.send_message(msg.chat.id, "", reply_markup=remove_keyboard)
 
-    # 2. الترتيب الجديد: مشاهدة الاعلانات الاولى
+    # الترتيب الجديد: مشاهدة الاعلانات قبل عرض الرصيد
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     keyboard.add(
         types.InlineKeyboardButton("🎥 مشاهدة الاعلانات", callback_data="claim"),
@@ -54,12 +54,13 @@ def callback(call):
         user = get_user(uid)
         new_balance = user['balance'] + 0.00001
         update_balance(uid, new_balance)
-        bot.answer_callback_query(call.id, f"تم اضافة 0.00001 LTC")
+        bot.answer_callback_query(call.id, f"تم اضافة 0.00001 LTC") # هذي تبقى صغيرة تحت
         start(call.message)
 
     elif call.data == "balance":
         user = get_user(uid)
-        bot.answer_callback_query(call.id, f"رصيدك: {user['balance']:.5f} LTC", show_alert=True)
+        bot.answer_callback_query(call.id) # نمسح الدائرة برك
+        bot.send_message(call.message.chat.id, f"💳 رصيدك الحالي: {user['balance']:.5f} LTC") # رسالة عادية
 
     elif call.data == "withdraw":
         user = get_user(uid)
@@ -73,7 +74,7 @@ def callback(call):
 
     elif call.data == "setaddress":
         user_states[uid] = 'waiting_new_email'
-        bot.send_message(call.message.chat.id, "ضع الايميل الجديد. سيتم استبدال القديم مباشرة.")
+        bot.send_message(call.message.chat.id, "ضع إيميل FaucetPay الجديد")
         bot.answer_callback_query(call.id)
 
 @bot.message_handler(func=lambda m: user_states.get(m.from_user.id) in ['waiting_email', 'waiting_new_email'])
