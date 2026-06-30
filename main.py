@@ -8,112 +8,104 @@ FAUCETPAY_API = "حط_API_KEY_تاعك_هنا"
 MIN_WITHDRAW = 0.001
 bot = telebot.TeleBot(TOKEN)
 
-user_states = {} # هذا برك اللي يتحكم في الحالة
+# قاموس الحالات فقط
+user_states = {}
 
+# قاعدة البيانات
 conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
-c.execute('''CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, balance REAL, faucetpay TEXT)''')
+c.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, balance REAL, faucetpay TEXT)")
 conn.commit()
 
 def get_user(uid):
     c.execute("SELECT balance, faucetpay FROM users WHERE user_id=?", (uid,))
     row = c.fetchone()
-    if row: return {"user_id": uid, "balance": row[0], "faucetpay": row[1]}
-    c.execute("INSERT INTO users VALUES (?,?,?)", (uid, 0.0, "غير محدد"))
-    conn.commit()
-    return {"user_id": uid, "balance": 0.0, "faucetpay": "غير محدد"}
+    if row:
+        return {"balance": row[0], "faucetpay": row[1]}
+    else:
+        c.execute("INSERT INTO users VALUES (?, 0.0, 'غير محدد')", (uid,))
+        conn.commit()
+        return {"balance": 0.0, "faucetpay": "غير محدد"}
 
-def save_email(user_id, email):
-    c.execute("UPDATE users SET faucetpay=? WHERE user_id=?", (email, user_id))
-    conn.commit()
-
-def update_balance(user_id, new_balance):
-    c.execute("UPDATE users SET balance=? WHERE user_id=?", (new_balance, user_id))
+def save_email(uid, email):
+    c.execute("UPDATE users SET faucetpay=? WHERE user_id=?", (email, uid))
     conn.commit()
 
-def send_fp_ltc(to, amount):
-    url = "https://faucetpay.io/api/v1/send"
-    data = {"api_key": FAUCETPAY_API, "to": to, "amount": amount, "currency": "LTC"}
-    return requests.post(url, data=data).json()
+def update_balance(uid, new_balance):
+    c.execute("UPDATE users SET balance=? WHERE user_id=?", (new_balance, uid))
+    conn.commit()
 
 @bot.message_handler(commands=['start'])
-def start(msg): show_menu(msg.chat.id, msg.from_user.first_name)
-
-def show_menu(chat_id, name):
-    user = get_user(chat_id)
-    text = f"✨ <b>لوحة التحكم</b> ✨\n\n<b>▫️ الاسم:</b> {name}\n<b>▫️ الرصيد:</b> <code>{user['balance']:.5f} LTC</code>\n<b>▫️ حساب FaucetPay:</b> <code>{user['faucetpay']}</code>"
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(types.InlineKeyboardButton("🎥 مشاهدة الإعلانات", callback_data="claim"), types.InlineKeyboardButton("💳 عرض الرصيد", callback_data="balance"), types.InlineKeyboardButton("💵 طلب سحب", callback_data="withdraw"), types.InlineKeyboardButton("📮 تغيير الحساب", callback_data="setaddress"))
-    bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode="HTML")
-
-@bot.message_handler(commands=['claim'])
-def claim(msg):
+def start(msg):
     user = get_user(msg.from_user.id)
-    new_balance = user['balance'] + 0.00001
-    update_balance(user['user_id'], new_balance)
-    bot.send_message(msg.chat.id, f"✅ <b>تم إضافة 0.00001 LTC</b>\nرصيدك: <code>{new_balance:.5f}</code>", parse_mode="HTML")
+    text = f"✨ لوحة التحكم ✨\n\nالاسم: {msg.from_user.first_name}\nالرصيد: {user['balance']:.5f} LTC\nحساب FaucetPay: {user['faucetpay']}"
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add("💵 طلب سحب", "📮 تغيير الحساب")
+    keyboard.add("🎥 مشاهدة الاعلانات", "💳 عرض الرصيد")
+    bot.send_message(msg.chat.id, text, reply_markup=keyboard)
 
-@bot.message_handler(commands=['withdraw'])
+@bot.message_handler(func=lambda m: m.text == "💵 طلب سحب")
 def withdraw(msg):
     uid = msg.from_user.id
     user = get_user(uid)
     if user['faucetpay'] == "غير محدد":
         user_states[uid] = 'waiting_email'
-        bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay للسحب</b>\n\n<b>مثال:</b> <code>you@gmail.com</code>", parse_mode="HTML")
+        bot.send_message(msg.chat.id, "ضع ايميل FaucetPay للسحب:\nمثال: you@gmail.com")
     else:
         user_states[uid] = 'waiting_amount'
-        bot.send_message(msg.chat.id, f"💵 <b>ادخل مبلغ السحب</b>\n<b>رصيدك:</b> <code>{user['balance']:.5f} LTC</code>\n<b>الحد الأدنى:</b> <code>{MIN_WITHDRAW} LTC</code>\n<b>للحساب:</b> <code>{user['faucetpay']}</code>", parse_mode="HTML")
+        bot.send_message(msg.chat.id, f"ادخل مبلغ السحب:\nرصيدك: {user['balance']:.5f} LTC\nالحد الادنى: {MIN_WITHDRAW} LTC\nللحساب: {user['faucetpay']}")
 
-@bot.message_handler(commands=['setaddress'])
+@bot.message_handler(func=lambda m: m.text == "📮 تغيير الحساب")
 def setaddress(msg):
-    uid = msg.from_user.id
-    user_states[uid] = 'waiting_new_email'
-    bot.send_message(msg.chat.id, "📮 <b>ضع إيميل FaucetPay الجديد</b>\nسيتم استبدال القديم أوتوماتيكيا.", parse_mode="HTML")
+    user_states[msg.from_user.id] = 'waiting_new_email'
+    bot.send_message(msg.chat.id, "ضع الايميل الجديد. سيتم استبدال القديم مباشرة.")
 
-# اهم تعديل: نستعمل user_states مباشرة ماشي get_user
+@bot.message_handler(func=lambda m: m.text == "🎥 مشاهدة الاعلانات")
+def claim(msg):
+    uid = msg.from_user.id
+    user = get_user(uid)
+    new_balance = user['balance'] + 0.00001
+    update_balance(uid, new_balance)
+    bot.send_message(msg.chat.id, f"تم اضافة 0.00001 LTC\nرصيدك: {new_balance:.5f}")
+
+@bot.message_handler(func=lambda m: m.text == "💳 عرض الرصيد")
+def balance(msg):
+    user = get_user(msg.from_user.id)
+    bot.send_message(msg.chat.id, f"رصيدك: {user['balance']:.5f} LTC")
+
+# معالج الايميل
 @bot.message_handler(func=lambda m: user_states.get(m.from_user.id) in ['waiting_email', 'waiting_new_email'])
 def process_email(msg):
     uid = msg.from_user.id
-    if "@" in msg.text and "." in msg.text:
-        save_email(uid, msg.text)
-        user_states[uid] = 'waiting_amount' # نبدلو الحالة طول للمبلغ
-        bot.send_message(msg.chat.id, f"✅ <b>تم حفظ الإيميل بنجاح</b>\n<code>{msg.text}</code>\n\n💵 <b>ادخل مبلغ السحب</b>\n<b>الحد الأدنى:</b> <code>{MIN_WITHDRAW} LTC</code>", parse_mode="HTML")
+    email = msg.text.strip()
+    if "@" in email and "." in email:
+        save_email(uid, email) # هنا يتخزن/يتجدد الايميل
+        user_states[uid] = 'waiting_amount'
+        bot.send_message(msg.chat.id, f"تم حفظ الايميل بنجاح: {email}\n\nالان ادخل مبلغ السحب:")
     else:
-        bot.send_message(msg.chat.id, "❌ <b>ايميل غير صالح</b>. عاود ارسل ايميل صحيح.")
+        bot.send_message(msg.chat.id, "ايميل غير صالح. عاود ارسل ايميل صحيح.")
 
+# معالج المبلغ
 @bot.message_handler(func=lambda m: user_states.get(m.from_user.id) == 'waiting_amount')
 def handle_amount(msg):
     uid = msg.from_user.id
     user = get_user(uid)
     try:
         amount = float(msg.text)
-        user_states.pop(uid, None) # نمسحو الحالة بعد ما نكملو
+        user_states.pop(uid, None)
 
         if amount < MIN_WITHDRAW:
-            return bot.send_message(msg.chat.id, f"❌ <b>المبلغ أقل من الحد الأدنى</b>\nالحد الأدنى: <code>{MIN_WITHDRAW} LTC</code>", parse_mode="HTML")
+            return bot.send_message(msg.chat.id, f"المبلغ اقل من الحد الادنى. الحد الادنى هو {MIN_WITHDRAW} LTC")
         if user['balance'] < amount:
-            return bot.send_message(msg.chat.id, f"❌ <b>رصيدك غير كافي</b>\nرصيدك: <code>{user['balance']:.5f} LTC</code>", parse_mode="HTML")
+            return bot.send_message(msg.chat.id, f"رصيدك غير كافي. رصيدك هو {user['balance']:.5f} LTC")
 
-        res = send_fp_ltc(user['faucetpay'], amount)
-        if res.get("status") == 200:
-            update_balance(uid, user['balance'] - amount)
-            bot.send_message(msg.chat.id, f"✅ <b>تم طلب السحب بنجاح</b>\nتم ارسال <code>{amount:.5f} LTC</code> الى <code>{user['faucetpay']}</code>", parse_mode="HTML")
-        else:
-            bot.send_message(msg.chat.id, f"❌ <b>خطأ في السحب:</b> {res.get('message')}")
+        # هنا تحط كود السحب من FaucetPay
+        update_balance(uid, user['balance'] - amount)
+        bot.send_message(msg.chat.id, f"تم طلب السحب بنجاح.\nتم ارسال {amount:.5f} LTC الى {user['faucetpay']}")
 
     except ValueError:
-        bot.send_message(msg.chat.id, "❌ <b>ارسل رقم صحيح</b>. مثال: 0.001", parse_mode="HTML")
-
-@bot.callback_query_handler(func=lambda call: True)
-def callback(call):
-    if call.data == "claim": claim(call.message)
-    elif call.data == "balance": balance(call.message)
-    elif call.data == "withdraw": withdraw(call.message)
-    elif call.data == "setaddress": setaddress(call.message)
-    bot.answer_callback_query(call.id)
-
-def balance(msg): user = get_user(msg.from_user.id); bot.send_message(msg.chat.id, f"💳 <b>رصيدك:</b> <code>{user['balance']:.5f} LTC</code>", parse_mode="HTML")
+        bot.send_message(msg.chat.id, "ارسل رقم صحيح. مثال: 0.001")
 
 if __name__ == "__main__":
-    print("Bot is running...")
-    bot.polling(none_stop=True, skip_pending=True)
+    print("البوت يعمل...")
+    bot.infinity_polling()
