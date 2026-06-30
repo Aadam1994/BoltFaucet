@@ -31,7 +31,11 @@ def start(msg):
     user = get_user(msg.from_user.id)
     text = f"✨ لوحة التحكم ✨\n\nالاسم: {msg.from_user.first_name}\nالرصيد: {user['balance']:.5f} LTC\nحساب FaucetPay: {user['faucetpay']}"
 
-    # تعديل الازرار + الترتيب الجديد
+    # 1. نمسحو الازرار القديمة اللي تحت الكتابة
+    remove_keyboard = types.ReplyKeyboardRemove()
+    bot.send_message(msg.chat.id, "تم تحديث القائمة", reply_markup=remove_keyboard)
+
+    # 2. الترتيب الجديد: مشاهدة الاعلانات الاولى
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     keyboard.add(
         types.InlineKeyboardButton("🎥 مشاهدة الاعلانات", callback_data="claim"),
@@ -50,7 +54,7 @@ def callback(call):
         user = get_user(uid)
         new_balance = user['balance'] + 0.00001
         update_balance(uid, new_balance)
-        bot.answer_callback_query(call.id, "تم اضافة 0.00001 LTC")
+        bot.answer_callback_query(call.id, f"تم اضافة 0.00001 LTC")
         start(call.message)
 
     elif call.data == "balance":
@@ -98,7 +102,7 @@ def handle_amount(msg):
 
         update_balance(uid, user['balance'] - amount)
         bot.send_message(msg.chat.id, f"تم طلب السحب بنجاح.\nتم ارسال {amount:.5f} LTC الى {user['faucetpay']}")
-        start(msg) # نرجعو للقائمة
+        start(msg)
 
     except ValueError:
         bot.send_message(msg.chat.id, "ارسل رقم صحيح. مثال: 0.001")
